@@ -1,0 +1,65 @@
+`timescale 1ns / 1ps
+module exp_golomb_tb;
+
+    reg signed [15:0] x_in;    // Input: Signed integer
+    wire [15:0] code_out;      // Output: Encoded value (16-bit)
+
+    exp_golomb_encoder uut (
+        .x_in(x_in),
+        .code_out(code_out)
+    );
+
+    // File handling
+    integer file_ptr, bin_ptr;
+    integer scan_status;
+    integer line_num;          // Track line number for debugging
+    integer signed tmp;        // Temporary variable for file reading
+
+    initial begin
+        // Open input file for reading
+        file_ptr = $fopen("C:/Users//Documents/New folder/residuals.txt", "r");
+        if (!file_ptr) begin
+            $display("ERROR: Input file not found.");
+            $finish;
+        end
+
+        // Open binary file for writing
+        bin_ptr = $fopen("C:/Users//Documents/New folder/encoded_data.bin", "wb");
+        if (!bin_ptr) begin
+            $display("ERROR: Failed to create binary file.");
+            $fclose(file_ptr);
+            $finish;
+        end
+
+        // Process file data
+        line_num = 0;
+        while (!$feof(file_ptr)) begin
+            scan_status = $fscanf(file_ptr, "%d", tmp);
+            
+            // Handle invalid entries
+            if (scan_status != 1) begin
+                if (!$feof(file_ptr)) begin
+                    $display("WARNING: Skipping invalid line %d.", line_num);
+                end
+                line_num = line_num + 1;
+            end else begin
+                x_in = tmp[15:0];  // Truncate to 16-bit signed value
+                #10;               // Delay for signal stability
+
+                // Write 16-bit encoded data to binary file (Little Endian format)
+                $fwrite(bin_ptr, "%c%c", code_out[7:0], code_out[15:8]); 
+
+                // Display for verification
+                $display("Sample %0d | x_in = %d | Encoded = %b", line_num, x_in, code_out);
+                
+                line_num = line_num + 1;
+            end
+        end
+
+        // Clean up
+        $fclose(file_ptr);
+        $fclose(bin_ptr);
+        $display("Encoding completed. Processed %d samples.", line_num);
+        $finish;
+    end
+endmodule
