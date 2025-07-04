@@ -1,0 +1,19 @@
+module exp_golomb_encoder (
+    input signed [15:0] x_in,   // Input: Signed integer (-9999 to 9999)
+    output reg [15:0] code_out  // Output: Encoded Exp-Golomb (16-bit)
+);
+
+    reg [15:0] y;  // Mapped non-negative integer
+
+    always @(*) begin
+        // Step 1: Map signed x to non-negative y
+        if (x_in < 0) begin
+            y = (-2 * x_in) - 1; // Odd for negatives
+        end else begin
+            y = 2 * x_in;        // Even for non-negatives
+        end
+
+        // Step 2: Store y directly as the encoded value
+        code_out = y;
+    end
+endmodule
