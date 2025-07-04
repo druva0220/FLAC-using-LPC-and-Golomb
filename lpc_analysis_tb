@@ -1,0 +1,91 @@
+`timescale 1ns/1ps
+module lpc_analysis_tb;
+
+    reg clk, rst, valid;
+    reg signed [15:0] sample_in;
+    wire signed [15:0] residual_out;
+
+    integer file, status;
+    reg [15:0] sample_data [0:845535]; // Array for storing all 845,535 samples
+    integer index = 0;
+    integer i;
+
+    // File handles for residuals and coefficients
+    integer residual_file, coeff_file;
+
+    // Instantiate DUT
+    lpc_analysis dut (
+        .clk(clk),
+        .rst(rst),
+        .valid(valid),
+        .sample_in(sample_in),
+        .residual_out(residual_out)
+    );
+
+    // Clock generation
+    always #5 clk = ~clk;
+
+    // File Reading and Writing Tasks
+    initial begin
+        // Initialize signals
+        clk = 0;
+        rst = 1;
+        valid = 0;
+        sample_in = 0;
+
+        // Hold reset to initialize registers
+        #20;
+        rst = 0;
+
+        // Open and read the input hex file
+        file = $fopen("C:/Users/New folder/LPC/audio_samples.hex", "r");
+        if (file == 0) begin
+            $display("ERROR: Could not open audio_samples.hex!");
+            $finish;
+        end
+
+        // Read all samples into memory
+        while (!$feof(file) && index < 845535) begin
+            status = $fscanf(file, "%h\n", sample_data[index]);
+            index = index + 1;
+        end
+        $fclose(file);
+
+        // Write LPC coefficients to file
+        coeff_file = $fopen("lpc_coefficients.txt", "w");
+        if (coeff_file == 0) begin
+            $display("ERROR: Could not create coefficients file!");
+            $finish;
+        end
+        for (i = 0; i < 10; i=i+1) begin
+            $fwrite(coeff_file, "%d\n", dut.lpc_coeffs[i]); // Hierarchical reference to coefficients
+        end
+        $fclose(coeff_file);
+
+        // Open residuals file
+        residual_file = $fopen("residuals.txt", "w");
+        if (residual_file == 0) begin
+            $display("ERROR: Could not create residuals file!");
+            $finish;
+        end
+
+        // Process all samples and write residuals
+        for (index = 0; index < 845535; index = index + 1) begin
+            valid = 1;
+            sample_in = sample_data[index];
+            #10; // Wait for residual computation
+            $fwrite(residual_file, "%d\n", residual_out); // Write residual to file
+
+            // Progress reporting
+            if (index % 10000 == 0) 
+                $display("Progress: %0d samples processed...", index);
+        end
+
+        // Cleanup
+        valid = 0;
+        $fclose(residual_file);
+        $display("Simulation finished. Residuals and coefficients saved.");
+        $finish;
+    end
+endmodule
+
